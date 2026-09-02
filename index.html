@@ -2,90 +2,98 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>اوقات شرعی ارومیه</title>
+    <title>اوقات شرعی ارومیه - آنلاین</title>
     <style>
         body { font-family: Tahoma, sans-serif; text-align: center; background: #2c3e50; color: white; padding: 20px; }
         .card { background: #34495e; padding: 20px; border-radius: 15px; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 320px; }
         .time-item { margin: 10px 0; padding: 8px; border-bottom: 1px solid #7f8c8d; }
         #timer { font-size: 1.2rem; color: #f1c40f; margin: 15px 0; font-weight: bold; }
-        #date-display { font-size: 0.9rem; color: #bdc3c7; margin-bottom: 10px; }
-        button { padding: 10px 20px; cursor: pointer; background: #e74c3c; border: none; color: white; border-radius: 5px; margin-top: 10px; font-size: 16px; }
+        button { padding: 10px 20px; cursor: pointer; background: #e74c3c; border: none; color: white; border-radius: 5px; margin-top: 10px; width: 100%; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h2>اوقات شرعی ارومیه</h2>
-        <div id="date-display">...</div>
-        <div id="timer">...</div>
+        <div id="date-display">در حال دریافت تاریخ...</div>
+        <div id="timer">در حال دریافت اوقات...</div>
         
         <div id="times-list">
-            <div class="time-item">صبح: <span id="sobh">04:31</span></div>
-            <div class="time-item">ظهر: <span id="zohr">12:29</span></div>
-            <div class="time-item">عصر: <span id="asrr">16:08</span></div>
-            <div class="time-item">مغرب: <span id="magreb">19:16</span></div>
-            <div class="time-item">عشا: <span id="esha">20:30</span></div>
+            <div class="time-item">صبح: <span id="sobh">--:--</span></div>
+            <div class="time-item">ظهر: <span id="zohr">--:--</span></div>
+            <div class="time-item">عصر: <span id="asrr">--:--</span></div>
+            <div class="time-item">مغرب: <span id="magreb">--:--</span></div>
+            <div class="time-item">عشا: <span id="esha">--:--</span></div>
         </div>
 
         <button id="enable-btn">فعال‌سازی صدا و هشدار</button>
     </div>
 
     <script>
-        // تعریف شیء صوتی با لینک مستقیم
+        var prayerTimes = {};
         var audio = new Audio('https://v.delgarm.com/mp3/804/2021/06/15/1623739897_D1kA7.mp3');
-        var notified = {}; 
+        var notified = {};
 
-        // ۱. فعال‌سازی قابلیت‌ها با کلیک کاربر
+        // ۱. دریافت داده از API
+        function fetchPrayerTimes() {
+            var url = 'https://api.aladhan.com/v1/timingsByCity?city=Urmia&country=Iran&method=7';
+            fetch(url)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    var t = data.data.timings;
+                    prayerTimes = {
+                        sobh: t.Fajr,
+                        zohr: t.Dhuhr,
+                        asrr: t.Asr,
+                        magreb: t.Maghrib,
+                        esha: t.Isha
+                    };
+                    updateUI();
+                })
+                .catch(function(err) { console.error("خطا در دریافت API", err); });
+        }
+
+        // ۲. نمایش اطلاعات در صفحه
+        function updateUI() {
+            for (var key in prayerTimes) {
+                var el = document.getElementById(key);
+                if (el) el.innerHTML = prayerTimes[key];
+            }
+            
+            // نمایش تاریخ
+            var d = new Date().toLocaleDateString('fa-IR', { calendar: 'persian', dateStyle: 'full' });
+            document.getElementById('date-display').innerHTML = d;
+        }
+
+        // ۳. دکمه فعال‌سازی (برای رفع مشکل پخش صدا)
         document.getElementById('enable-btn').onclick = function() {
             // اجازه نوتیفیکیشن
             if (window.Notification && Notification.permission !== "granted") {
                 Notification.requestPermission();
             }
-            // "گرم کردن" صدا برای اینکه مرورگر اجازه پخش بدهد
+            // تست صدا برای آنلاک کردن مرورگر
             audio.play().then(function() {
                 audio.pause();
                 audio.currentTime = 0;
-                document.getElementById('enable-btn').innerText = "هشدارها فعال شد";
-                document.getElementById('enable-btn').style.background = "#27ae60";
-            }).catch(function(e) {
-                alert("لطفاً یک بار دیگر روی دکمه کلیک کنید یا تنظیمات صدا را بررسی کنید.");
-            });
+                alert("صدا و هشدارها فعال شد.");
+            }).catch(function(e) { alert("لطفاً دوباره کلیک کنید."); });
         };
 
-        // ۲. نمایش تاریخ شمسی
-        function updateDate() {
-            var options = { calendar: 'persian', dateStyle: 'full' };
-            var d = new Date().toLocaleDateString('fa-IR', options);
-            document.getElementById('date-display').innerHTML = d;
-        }
-
-        // ۳. منطق اصلی
-        function checkTimes() {
+        // ۴. منطق بررسی زمان
+        function checkAzan() {
             var now = new Date();
-            var hours = now.getHours();
-            var minutes = now.getMinutes();
-            
-            // لیست زمان‌ها برای چک کردن
-            var prayerTimes = {
-                sobh: "4:32",
-                zohr: "12:29",
-                asrr: "16:7",
-                magreb: "19:15",
-                esha: "20:5"
-            };
+            var h = now.getHours().toString().padStart(2, '0');
+            var m = now.getMinutes().toString().padStart(2, '0');
+            var currentTimeString = h + ":" + m;
+
+            document.getElementById('timer').innerHTML = "ساعت: " + h + ":" + m;
 
             for (var key in prayerTimes) {
-                var timeParts = prayerTimes[key].split(':');
-                var h = parseInt(timeParts[0]);
-                var m = parseInt(timeParts[1]);
-
-                if (hours == h && minutes == m) {
+                if (prayerTimes[key] === currentTimeString) {
                     if (!notified[key]) {
-                        // پخش صدا
                         audio.play();
-                        // نمایش نوتیفیکیشن
                         if (window.Notification && Notification.permission === "granted") {
-                            new Notification("اذان " + key, { body: "وقت اذان " + key + " فرا رسید." });
+                            new Notification("اذان " + key, { body: "وقت اذان فرا رسید." });
                         }
                         notified[key] = true;
                     }
@@ -93,13 +101,12 @@
                     notified[key] = false;
                 }
             }
-            
-            document.getElementById('timer').innerHTML = "ساعت سیستم: " + (hours < 10 ? '0'+hours : hours) + ":" + (minutes < 10 ? '0'+minutes : minutes);
-            updateDate();
         }
 
-        setInterval(checkTimes, 1000);
-        checkTimes();
+        // اجرای اولیه
+        fetchPrayerTimes();
+        setInterval(checkAzan, 10000); // هر ۱۰ ثانیه چک کن
+        checkAzan();
     </script>
 </body>
 </html>
